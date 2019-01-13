@@ -5,8 +5,8 @@ import gym
 from baselines.common.distributions import make_pdtype
 import numpy as np
 
-from policies.utils import *
-from policies.utils import *
+from policy_transfer.policies.utils import *
+from policy_transfer.policies.utils import *
 
 class MirrorPolicy(object):
     recurrent = False

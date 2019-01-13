@@ -3,8 +3,8 @@ from utils.optimizer import *
 from gym_wrapper.osi_env_wrapper import *
 import numpy as np
 import gym, joblib, tensorflow as tf
-from policies.mirror_policy import *
-from policies.mlp_policy import *
+from policy_transfer.policies.mirror_policy import *
+from policy_transfer.policies.mlp_policy import *
 from baselines import logger
 from baselines.common import tf_util as U
 from baselines.common.mpi_adam import MpiAdam

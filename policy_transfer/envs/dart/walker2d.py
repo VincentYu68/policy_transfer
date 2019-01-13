@@ -1,7 +1,7 @@
 import numpy as np
 from gym import utils
-from envs.dart import dart_env
-from envs.dart.parameter_managers import *
+from policy_transfer.envs.dart import dart_env
+from policy_transfer.envs.dart.parameter_managers import *
 
 
 class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):

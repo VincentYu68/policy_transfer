@@ -11,8 +11,8 @@ import six
 import time
 
 
-from envs.dart.static_window import *
-from envs.dart.dart_world import *
+from policy_transfer.envs.dart.static_window import *
+from policy_transfer.envs.dart.dart_world import *
 
 try:
     import pydart2 as pydart

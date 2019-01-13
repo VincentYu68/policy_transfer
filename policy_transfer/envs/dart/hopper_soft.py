@@ -1,32 +1,27 @@
 import numpy as np
 from gym import utils
-from envs.dart import dart_env
+from policy_transfer.envs.dart import dart_env
 
-from envs.dart.parameter_managers import *
-import copy
+from policy_transfer.envs.dart.parameter_managers import *
 
-
-class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
+class DartHopperSoftEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
-        self.control_bounds = np.array([[1.0]*6,[-1.0]*6])
-        self.g_action_scaler = 1.0
-        self.action_scale = np.array([120, 90, 60, 120, 60, 30]) * 1.0
+        self.control_bounds = np.array([[1.0, 1.0, 1.0],[-1.0, -1.0, -1.0]])
+        self.action_scale = np.array([200.0, 200.0, 200.0]) * 1.0
         self.train_UP = False
         self.noisy_input = False
-        obs_dim = 17
-        self.tilt_z = 0.0
+        obs_dim = 11
 
         self.velrew_weight = 1.0
         self.UP_noise_level = 0.0
         self.resample_MP = False  # whether to resample the model paraeters
 
-        self.actuator_nonlinearity = False
-        self.actuator_nonlin_coef = 1.0
-
-        self.param_manager = cheetahParamManager(self)
+        self.param_manager = hopperContactMassManager(self)
 
         if self.train_UP:
             obs_dim += len(self.param_manager.activated_param)
+
+        self.use_sparse_reward = False
 
         self.t = 0
 
@@ -37,13 +32,11 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         obs_dim *= self.include_obs_history
         obs_dim += len(self.control_bounds[0]) * self.include_act_history
 
-        dart_env.DartEnv.__init__(self, ['half_cheetah.skel'], 5, obs_dim, self.control_bounds, disableViewer=True, dt=0.01)
+        dart_env.DartEnv.__init__(self, ['hopper_softfoot.skel'], 4, obs_dim, self.control_bounds, disableViewer=True)
 
         self.initial_local_coms = [np.copy(bn.local_com()) for bn in self.robot_skeleton.bodynodes]
 
-        self.current_param = self.param_manager.get_simulator_parameters()
-
-        self.dart_worlds[0].set_collision_detector(3)
+        self.dart_worlds[0].set_collision_detector(1)
 
         self.dart_world=self.dart_worlds[0]
         self.robot_skeleton=self.dart_world.skeletons[-1]
@@ -54,14 +47,10 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         self.obs_delay = 0
         self.act_delay = 0
 
-        #self.param_manager.set_simulator_parameters(self.current_param)
-
-        print('sim parameters: ', self.param_manager.get_simulator_parameters())
-        self.current_param = self.param_manager.get_simulator_parameters()
-        self.active_param = self.param_manager.activated_param
-
         # data structure for actuation modeling
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
+
+        self.horizon = 10000
 
         utils.EzPickle.__init__(self)
 
@@ -74,8 +63,6 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         return a[3:]
 
     def advance(self, a):
-        if self.actuator_nonlinearity:
-            a = np.tanh(self.actuator_nonlin_coef * a)
         self.action_buffer.append(np.copy(a))
         if len(self.action_buffer) < self.act_delay + 1:
             a *= 0
@@ -91,7 +78,7 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
                 clamped_control[i] = self.control_bounds[1][i]
 
         tau = np.zeros(self.robot_skeleton.ndofs)
-        tau[3:] = clamped_control * self.action_scale * self.g_action_scaler
+        tau[3:] = clamped_control * self.action_scale
         self.do_simulation(tau, self.frame_skip)
 
 
@@ -102,8 +89,23 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         self.dart_world.check_collision()
 
     def terminated(self):
+        self.fall_on_ground = False
+        contacts = self.dart_world.collision_result.contacts
+        total_force_mag = 0
+        permitted_contact_bodies = [self.robot_skeleton.bodynodes[-1], self.robot_skeleton.bodynodes[-2]]
+        for contact in contacts:
+            total_force_mag += np.square(contact.force).sum()
+            if contact.bodynode1 not in permitted_contact_bodies and contact.bodynode2 not in permitted_contact_bodies:
+                self.fall_on_ground = True
+
         s = self.state_vector()
-        done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and np.abs(s[2]) < 1.3)
+        height = self.robot_skeleton.bodynodes[2].com()[1]
+        ang = self.robot_skeleton.q[2]
+        done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and (np.abs(self.robot_skeleton.dq) < 100).all()\
+            #and not self.fall_on_ground)
+            and (height > self.height_threshold_low) and (abs(ang) < .4))
+        if self.cur_step >= self.horizon:
+            done = True
         return done
 
     def pre_advance(self):
@@ -112,15 +114,21 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
     def reward_func(self, a, step_skip=1):
         posafter = self.robot_skeleton.q[0]
         alive_bonus = 1.0
+        joint_limit_penalty = 0
+        for j in [-2]:
+            if (self.robot_skeleton.q_lower[j] - self.robot_skeleton.q[j]) > -0.05:
+                joint_limit_penalty += abs(1.5)
+            if (self.robot_skeleton.q_upper[j] - self.robot_skeleton.q[j]) < 0.05:
+                joint_limit_penalty += abs(1.5)
         reward = (posafter - self.posbefore) / self.dt * self.velrew_weight
         reward += alive_bonus * step_skip
-        reward -= 1e-1 * np.square(a).sum()
+        reward -= 1e-3 * np.square(a).sum()
+        reward -= 5e-1 * joint_limit_penalty
 
-        s = self.state_vector()
-        done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all())
-
-        if done:
-            reward = 0
+        if self.use_sparse_reward:
+            reward = 0.0
+            if self.terminated():
+                reward = self.robot_skeleton.q[0]
 
         return reward
 
@@ -145,6 +153,7 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
             self.robot_skeleton.q[1:],
             self.robot_skeleton.dq,
         ])
+        state[0] = self.robot_skeleton.bodynodes[2].com()[1]
 
         if self.train_UP:
             UP = self.param_manager.get_simulator_parameters()
@@ -177,8 +186,8 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         for world in self.dart_worlds:
             world.reset()
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
-        qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
-        qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        qpos = self.robot_skeleton.q# + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        qvel = self.robot_skeleton.dq# + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
 
         self.set_state(qpos, qvel)
         if self.resample_MP:
@@ -204,10 +213,12 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
 
     def state_vector(self):
         s = np.copy(np.concatenate([self.robot_skeleton.q, self.robot_skeleton.dq]))
+        s[1] += self.zeroed_height
         return s
 
     def set_state_vector(self, s):
         snew = np.copy(s)
+        snew[1] -= self.zeroed_height
         self.robot_skeleton.q = snew[0:len(self.robot_skeleton.q)]
         self.robot_skeleton.dq = snew[len(self.robot_skeleton.q):]
 
