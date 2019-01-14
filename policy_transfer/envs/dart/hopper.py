@@ -25,17 +25,12 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.t = 0
 
-        self.action_buffer = []
-
         self.total_dist = []
 
         self.include_obs_history = 1
         self.include_act_history = 0
         obs_dim *= self.include_obs_history
         obs_dim += len(self.control_bounds[0]) * self.include_act_history
-
-        if self.input_time:
-            obs_dim += 1
 
         dart_env.DartEnv.__init__(self, ['hopper_capsule.skel'], 4, obs_dim, self.control_bounds, disableViewer=True)
 
@@ -136,8 +131,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         return reward
 
     def step(self, a):
-        self.action_buffer.append(np.copy(a))
-
         self.t += self.dt
         self.pre_advance()
         self.advance(a)
@@ -167,9 +160,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                 UP = np.clip(UP, -0.05, 1.05)
             state = np.concatenate([state, UP])
 
-        if self.input_time:
-            state = np.concatenate([state, [self.t]])
-
         if self.noisy_input:
             state = state + np.random.normal(0, .01, len(state))
 
@@ -182,7 +172,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                 final_obs = np.concatenate([final_obs, self.observation_buffer[-self.obs_delay-1-i]])
             else:
                 final_obs = np.concatenate([final_obs, self.observation_buffer[0]*0.0])
-
         for i in range(self.include_act_history):
             if i < len(self.action_buffer):
                 final_obs = np.concatenate([final_obs, self.action_buffer[-1-i]])
@@ -208,8 +197,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.action_buffer = []
 
         state = self._get_obs(update_buffer = True)
-
-        self.action_buffer = []
 
         self.cur_step = 0
 

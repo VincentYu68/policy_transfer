@@ -7,16 +7,8 @@ from baselines.common.mpi_adam import MpiAdam
 from baselines.common.mpi_moments import mpi_moments
 from mpi4py import MPI
 from collections import deque
-from sklearn import datasets, linear_model
-from sklearn import neighbors
-from sklearn.metrics import mean_squared_error, r2_score
-from baselines.common.cg import cg
-from policies.mlp_net import MlpNet, fit_mlpnet
 
 import os, errno
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from utils.common import *
 import copy
 import gc
@@ -40,9 +32,6 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     cur_ep_ret = 0 # return in current episode
     cur_ep_len = 0 # len of current episode
     ep_rets = [] # returns of completed episodes in this segment
-    ep_expinputs = []
-    exp_plots = []
-    exp_plot_onerollout = []
     ep_lens = [] # lengths of ...
 
     # Initialize history arrays
@@ -79,9 +68,6 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         if "avg_vel" in envinfo:
             avg_vels[i] = envinfo["avg_vel"]
 
-        if 'plot_info' in envinfo:
-            exp_plot_onerollout.append(envinfo['plot_info'])
-
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
@@ -91,14 +77,11 @@ def traj_segment_generator(pi, env, horizon, stochastic):
                     broke = True
             if not broke:
                 ep_rets.append(cur_ep_ret)
-                ep_expinputs.append(ob[-1])
                 ep_lens.append(cur_ep_len)
-                exp_plots.append(exp_plot_onerollout)
             else:
                 t = 0
             cur_ep_ret = 0
             cur_ep_len = 0
-            exp_plot_onerollout = []
             ob = env.reset()
         t += 1
 

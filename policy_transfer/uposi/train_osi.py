@@ -1,8 +1,9 @@
-from utils.mlp import *
-from utils.optimizer import *
-from gym_wrapper.osi_env_wrapper import *
+from policy_transfer.utils.mlp import *
+from policy_transfer.utils.optimizer import *
+from policy_transfer.uposi.osi_env_wrapper import *
 import numpy as np
 import gym, joblib, tensorflow as tf
+import policy_transfer.envs
 from policy_transfer.policies.mirror_policy import *
 from policy_transfer.policies.mlp_policy import *
 from baselines import logger
@@ -17,7 +18,7 @@ def osi_train_callback(model, name, iter):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env', help='environment ID', default='DartHopper-v1')
+    parser.add_argument('--env', help='environment ID', default='DartHopperPT-v1')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--name', help='name of experiments', type=str, default="")
     parser.add_argument('--OSI_hist', help='history step size', type=int, default=10)
@@ -25,7 +26,8 @@ if __name__ == '__main__':
     parser.add_argument('--dyn_params', action='append', type=int)
 
     parser.add_argument('--osi_iteration', help='number of iterations', type=int, default=6)
-    parser.add_argument('--training_sample_num', help='number of training samples per iteration', type=int, default=5000)
+    parser.add_argument('--training_sample_num', help='number of training samples per iteration', type=int, default=25000)
+    parser.add_argument('--action_noise', help='noise added to action', type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -48,7 +50,7 @@ if __name__ == '__main__':
         env_hist = time_limit.TimeLimit(minitaur_reactive_env.MinitaurReactiveEnv(render=False,
                                                                              accurate_motor_model_enabled=True,
                                                                              urdf_version='rainbow_dash_v0',
-                                                                             include_obs_history=10,
+                                                                             include_obs_history=OSI_hist,
                                                                              include_act_history=0,
                                                                              train_UP=False),
                                                                              max_episode_steps=1000)
@@ -65,9 +67,12 @@ if __name__ == '__main__':
         if env_hist.env.include_obs_history == 1 and env_hist.env.include_act_history == 0:
             from gym import spaces
 
-            env_hist.env.include_obs_history = 10
+            # modify observation space
+            env_hist.env.include_obs_history = OSI_hist
+            env_hist.env.include_act_history = OSI_hist
             obs_dim_base = env_hist.env.obs_dim
             env_hist.env.obs_dim = env_hist.env.include_obs_history * obs_dim_base
+            env_hist.env.obs_dim += len(env_hist.env.control_bounds[0]) * env_hist.env.include_act_history
 
             high = np.inf * np.ones(env_hist.env.obs_dim)
             low = -high
@@ -122,7 +127,7 @@ if __name__ == '__main__':
 
     # define osi model and optimizer
     osi = MLP(name='osi', in_dim=env_hist.observation_space.shape[0], out_dim=len(dyn_params), layers=[256, 128, 64],
-              activation=tf.nn.relu, last_activation=None)
+              activation=tf.nn.relu, last_activation=None, dropout=0.1)
     updater = MpiAdam(osi.get_trainable_variables())
     optimizer = RegressorOptimizer(osi, updater)
 
@@ -151,6 +156,8 @@ if __name__ == '__main__':
     env_up.reset()
     env_hist.reset()
 
+    input_data = []
+    output_data = []
     for iter in range(osi_iteration):
         print('------------- Iter ', iter, ' ----------------')
         # collect samples
@@ -158,12 +165,9 @@ if __name__ == '__main__':
         if iter > 0:
             env_to_use = osi_env
 
-        input_data = []
-        output_data = []
-
         lengths = []
-
-        while len(input_data) < training_sample_num:
+        collected_data_size = 0
+        while collected_data_size < training_sample_num:
             # collect one trajectory
             o = env_to_use.reset()
             length = 0
@@ -171,23 +175,26 @@ if __name__ == '__main__':
                 true_dyn = env_to_use.env.param_manager.get_simulator_parameters()
                 cur_state = env_to_use.env.state_vector()
 
-                env_hist.env.set_state_vector(cur_state)
-                input_data.append(env_hist.env._get_obs())
+                if iter == 0:
+                    env_hist.env.set_state_vector(cur_state)
+                    osi_input = env_hist.env._get_obs()
+                else:
+                    osi_input = env_to_use.env._get_obs()
+                input_data.append(osi_input)
                 output_data.append(true_dyn)
 
                 act, _ = up_policy.act(True, o)
-                o, r, d, _ = env_to_use.step(act)
+                o, r, d, _ = env_to_use.step(act + np.random.normal(0, args.action_noise, len(act)))
                 length += 1
+                collected_data_size += 1
 
                 if d:
                     lengths.append(length)
                     break
         print('Average rollout length: ', np.mean(lengths))
-        input_data = np.array(input_data)
-        output_data = np.array(output_data)
         #print(input_data.shape, output_data.shape)
         # update osi model
-        optimizer.fit_data(input_data, output_data, iter_num = 100, save_model_callback=osi_train_callback)
+        optimizer.fit_data(np.array(input_data), np.array(output_data), iter_num = 200, save_model_callback=osi_train_callback)
         params = osi.get_variable_dict()
         joblib.dump(params, logger.get_dir() + '/osi_params_'+str(iter)+'.pkl', compress=True)
 

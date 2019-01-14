@@ -17,7 +17,7 @@ class OSIEnvWrapper:
         self.action_space = env.action_space
 
     def process_raw_obs(self, raw_o):
-        one_obs_len = int(len(raw_o) / self.osi_hist)
+        one_obs_len = int((len(raw_o) - len(self.env.control_bounds[0]) * self.env.include_act_history) / self.env.include_obs_history)
         pred_mu = self.osi.predict(raw_o)[0]
         return np.concatenate([raw_o[0:one_obs_len], pred_mu])
 
