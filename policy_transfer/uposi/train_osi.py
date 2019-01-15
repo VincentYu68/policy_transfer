@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--dyn_params', action='append', type=int)
 
     parser.add_argument('--osi_iteration', help='number of iterations', type=int, default=6)
-    parser.add_argument('--training_sample_num', help='number of training samples per iteration', type=int, default=25000)
+    parser.add_argument('--training_sample_num', help='number of training samples per iteration', type=int, default=20000)
     parser.add_argument('--action_noise', help='noise added to action', type=float, default=0.0)
 
     args = parser.parse_args()
@@ -168,6 +168,8 @@ if __name__ == '__main__':
         lengths = []
         collected_data_size = 0
         while collected_data_size < training_sample_num:
+            env_up.reset()
+            env_hist.reset()
             # collect one trajectory
             o = env_to_use.reset()
             length = 0

@@ -123,14 +123,17 @@ if __name__ == '__main__':
     while True:
         input('Press enter to start the next rollout...')
         o = osi_env.reset()
+
         true_mp = []
         pred_mp = []
         length = 0
+        one_error = 0
         while True:
             act, _ = up_policy.act(False, o)
             o, r, d, _ = osi_env.step(act)
             true_mp.append(np.copy(osi_env.env.param_manager.get_simulator_parameters()))
             pred_mp.append(np.copy(o[-len(dyn_params):]))
+            one_error += np.sum(np.square(true_mp[-1] - pred_mp[-1]))
             length += 1
             osi_env.render()
             time.sleep(0.01)
@@ -140,6 +143,7 @@ if __name__ == '__main__':
 
             if d:
                 break
+        print('error: ', one_error / length)
         pred_mp = np.array(pred_mp)
         true_mp = np.array(true_mp)
         plt.figure()
