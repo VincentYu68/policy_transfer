@@ -2,7 +2,7 @@
 
 This is code for the following papers: 
 
-<a href="https://arxiv.org/abs/1810.05751">Policy Transfer with Strategy Optimization</a> (To be added later)
+<a href="https://arxiv.org/abs/1810.05751">Policy Transfer with Strategy Optimization</a> 
 
 <a href="https://arxiv.org/abs/1702.02453">Prepare for the Unknown: Learning a Universal Policy with Online System Identification</a>
 
@@ -26,7 +26,27 @@ pip install -e .
 ## How to use
 
 ### SO-CMA
-To be added later
+
+SO-CMA has two stages: training universal policy and strategy optimization.
+
+To train a universal policy, use the code in [ppo](policy_transfer/ppo).
+FOr the strategy optimization part, use the code in [test_socma](policy_transfer/policy_transfer_strategy_optimization/test_socma.py).
+
+An example of Dart hopper transferred to MuJoCo hopper can be found in [examples](examples):
+
+```bash
+examples/socma_hopper_5d_train.sh
+```
+
+The training results will be saved to data/.
+
+To perform strategy optimization, run:
+
+```bash
+examples/socma_hopper_5d_test.sh
+```
+
+You can also use [test_policy.py](policy_transfer/test_policy.py) to test individual policies.
 
 ### UP-OSI
 
@@ -55,3 +75,5 @@ and follow the prompt in the terminal. After each rollout a plot of the estimate
 ## ODE Internal Error
 If you see errors like: ODE INTERNAL ERROR 1: assertion "d[i] != dReal(0.0)" failed in _dLDLTRemove(), try downloading [lcp.cpp](https://drive.google.com/file/d/1MCho3QBtyPhSoKNV77VFOvCqsMJPk3NF/view) and replace the one in dart/external/odelcpsolver/ with it. Recompile Dart and Pydart2 afterward and the issue should be gone.
 
+## Additional feedbacks:
+Please contact Wenhao Yu (wenhaoyu@gatech.edu) if you have any feedbacks/questions about this work.

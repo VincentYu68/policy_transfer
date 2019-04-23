@@ -1,7 +1,7 @@
 import numpy as np
 from gym import utils
-from gym.envs.mujoco import mujoco_env
-from gym.envs.dart.parameter_managers import *
+from policy_transfer.envs.mujoco import mujoco_env
+from policy_transfer.envs.dart.parameter_managers import *
 
 class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 

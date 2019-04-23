@@ -11,7 +11,7 @@ import inspect
 import functools
 
 
-def run_one_traj(env, policy, stochastic=True, observation_app = None):
+def run_one_traj(env, policy, stochastic=True, observation_app = None, render=False):
     obs = []
     acs = []
     states = []
@@ -32,6 +32,8 @@ def run_one_traj(env, policy, stochastic=True, observation_app = None):
         else:
             ac = policy.act(stochastic, o)[0]
         o, r, d, _ = env.step(ac)
+        if render:
+            env.render()
         if hasattr(env, 'state_vector'):
             states.append(env.state_vector())
         if hasattr(env.env, 'use_qdqstate'):

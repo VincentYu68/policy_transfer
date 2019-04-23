@@ -22,8 +22,8 @@ class hopperContactMassManager:
         self.com_offset_range = [-0.05, 0.05]
         self.frame_skip_range = [4, 10]
 
-        self.activated_param = [0]#[0, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
-        self.controllable_param = [0]#[0, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.activated_param = [0, 1, 2, 5, 9]#[0, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.controllable_param = [0, 1, 2, 5, 9]#[0, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
         
         self.binned_param = 0 # don't bin if = 0
 
@@ -124,8 +124,6 @@ class hopperContactMassManager:
             frame_skip = x[cur_id] * (self.frame_skip_range[1] - self.frame_skip_range[0]) + self.frame_skip_range[0]
             self.simulator.frame_skip = int(frame_skip)
             cur_id += 1
-
-
 
     def resample_parameters(self):
         x = np.random.uniform(-0.05, 1.05, len(self.get_simulator_parameters()))

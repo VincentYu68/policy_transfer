@@ -10,7 +10,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.control_bounds = np.array([[1.0, 1.0, 1.0],[-1.0, -1.0, -1.0]])
         self.action_scale = np.array([200.0, 200.0, 200.0]) * 1.0
         self.train_UP = False
-        self.noisy_input = False
+        self.noisy_input = True
 
         obs_dim = 11
 

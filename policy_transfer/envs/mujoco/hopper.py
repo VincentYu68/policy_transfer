@@ -1,12 +1,12 @@
 import numpy as np
 from gym import utils
-from gym.envs.mujoco import mujoco_env
-from gym.envs.dart.parameter_managers import *
+from policy_transfer.envs.mujoco import mujoco_env
+from policy_transfer.envs.dart.parameter_managers import *
 
 class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
         self.train_UP = False
-        self.noisy_input = False
+        self.noisy_input = True
 
         self.resample_MP = False  # whether to resample the model paraeters
         self.param_manager = mjHopperManager(self)
@@ -127,8 +127,8 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return final_obs
 
     def reset_model(self):
-        qpos = self.init_qpos + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
-        qvel = self.init_qvel + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+        qpos = self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
+        qvel = self.init_qvel + self.np_random.uniform(low=-.1, high=.1, size=self.model.nv)
         self.set_state(qpos, qvel)
 
         self.observation_buffer = []

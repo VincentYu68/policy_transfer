@@ -1,0 +1,2 @@
+python policy_transfer/policy_transfer_strategy_optimization/test_socma.py --env HopperPT-v2 --name dart2mujoco_5d\
+     --UP_dim 5 --policy_path data/ppo_DartHopperPT-v10_5d_2_UP/policy_params.pkl --run_cma True
