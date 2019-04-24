@@ -9,9 +9,9 @@ from mpi4py import MPI
 from collections import deque
 
 import os, errno
-from utils.common import *
 import copy
 import gc
+from policy_transfer.utils.common import *
 
 def memory():
     import os
@@ -147,7 +147,8 @@ def learn(env, policy_func, *,
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
           init_policy_params = None,
-          policy_scope='pi'
+          policy_scope='pi',
+          refpolicy_params= None
         ):
     # Setup losses and stuff
     # ----------------------------------------
@@ -156,6 +157,11 @@ def learn(env, policy_func, *,
 
     pi = policy_func(policy_scope, ob_space, ac_space) # Construct network for new policy
     oldpi = policy_func("old"+policy_scope, ob_space, ac_space) # Network for old policy
+
+    if refpolicy_params is not None:
+        ref_pi = policy_func('ref'+policy_scope, env.env.base_env.observation_space, env.env.base_env.action_space,
+                             obname='refob')
+        env.env.ref_policy = ref_pi
 
     atarg = tf.placeholder(dtype=tf.float32, shape=[None]) # Target advantage function (if applicable)
     ret = tf.placeholder(dtype=tf.float32, shape=[None]) # Empirical return
@@ -240,6 +246,9 @@ def learn(env, policy_func, *,
                 tf.get_default_session().run(assign_op)
                 assign_op = oldpi.get_variables()[i].assign(init_policy_params[pi.get_variables()[i].name.replace(cur_scope, orig_scope, 1)])
                 tf.get_default_session().run(assign_op)
+
+    if refpolicy_params is not None:
+        assign_params(ref_pi, refpolicy_params)
 
     # Prepare for rollouts
     # ----------------------------------------

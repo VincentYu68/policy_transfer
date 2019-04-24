@@ -12,6 +12,7 @@ import numpy as np
 from mpi4py import MPI
 from policy_transfer.policies.mirror_policy import *
 from policy_transfer.policies.mlp_policy import MlpPolicy
+from policy_transfer.ppo.env_refpol import *
 
 output_interval = 10
 
@@ -30,7 +31,7 @@ def callback(localv, globalv):
 
 
 
-def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params):
+def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params, refpolicy):
     from policy_transfer.ppo import ppo_sgd
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(seed)
@@ -67,15 +68,19 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
     with open(logger.get_dir()+"/envinfo.txt", "w") as text_file:
         text_file.write(str(env.env.__dict__))
 
-    def policy_fn(name, ob_space, ac_space):
+    def policy_fn(name, ob_space, ac_space, obname='ob'):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=64, num_hid_layers=3)
+            hid_size=64, num_hid_layers=3, obname=obname)
 
     def policy_mirror_fn(name, ob_space, ac_space):
         return MirrorPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
             hid_size=64, num_hid_layers=3, observation_permutation=env.env.env.obs_perm,
                             action_permutation=env.env.env.act_perm, soft_mirror=(mirror==2))
 
+    refpolicy_params = None
+    if len(refpolicy) > 0:
+        refpolicy_params = joblib.load(refpolicy)
+        env = EnvRefPolicy(env, None)
 
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), "monitor.json"), allow_early_resets=True)
@@ -92,6 +97,8 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
         warstart_params = joblib.load(warmstart)
     else:
         warstart_params = None
+
+
     ppo_sgd.learn(env, pol_func,
             max_timesteps=num_timesteps,
             timesteps_per_batch=int(batch_size),
@@ -100,6 +107,7 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
             gamma=0.99, lam=0.95, schedule=schedule,
                         callback=callback,
                   init_policy_params=warstart_params,
+                  refpolicy_params = refpolicy_params
     )
 
 
@@ -119,8 +127,8 @@ def main():
     parser.add_argument('--dyn_params', action='append', type=int)
     parser.add_argument('--output_interval', help='interval of outputting policies', type=int, default=10)
     parser.add_argument('--mirror', help='whether to use mirror, (0: not mirror, 1: hard mirror, 2: soft mirror)', type=int, default=0)
-    parser.add_argument('--warmstart', help='path to warmstart policies',
-                        type=str, default="")
+    parser.add_argument('--refpolicy', help='path to reference policy', type=str, default="")
+    parser.add_argument('--warmstart', help='path to warmstart policies', type=str, default="")
 
 
     args = parser.parse_args()
@@ -140,10 +148,14 @@ def main():
     if args.train_up == 'True':
         config_name += '_UP'
 
+    if len(args.refpolicy) > 0:
+        config_name += '_refpol'
+
     logger.configure(config_name, ['json','stdout'])
     train(args.env, num_timesteps=int(args.max_step), seed=args.seed, batch_size=args.batch_size,
           clip=args.clip, schedule=args.schedule,
-          mirror=args.mirror, warmstart=args.warmstart, train_up=args.train_up=='True', dyn_params = args.dyn_params
+          mirror=args.mirror, warmstart=args.warmstart, train_up=args.train_up=='True', dyn_params = args.dyn_params,
+          refpolicy=args.refpolicy
           )
 
 if __name__ == '__main__':
