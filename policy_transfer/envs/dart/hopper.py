@@ -59,7 +59,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
 
         self.add_perturbation=True
-        self.perturbation_parameters = [0.5, 100, 2, 3] # probability, magnitude, bodyid, duration
+        self.perturbation_parameters = [0.2, 300, 5, 20] # probability, magnitude, bodyid, duration
 
         utils.EzPickle.__init__(self)
 

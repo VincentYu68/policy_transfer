@@ -4,7 +4,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import gym, joblib, tensorflow as tf
-from baselines.ppo1 import mlp_policy
 from baselines.common import tf_util as U
 from gym import spaces
 from baselines import logger
@@ -12,7 +11,9 @@ from baselines import logger
 from policy_transfer.policy_transfer_strategy_optimization.up_optimizer import UPOptimizer
 from policy_transfer.utils.common import *
 from policy_transfer.policies.mirror_policy import *
+from policy_transfer.policies.mlp_policy import *
 import policy_transfer.envs
+from policy_transfer.policies.composite_policy import *
 
 import numpy as np
 
@@ -27,6 +28,10 @@ if __name__ == '__main__':
     parser.add_argument('--run_cma', help='if False, load existing data and play policy', type=str, default="True")
     parser.add_argument('--max_step', help='maximum step allowed', type=int, default=50000)
     parser.add_argument('--sparse_rew', type=str, default='True')
+
+    parser.add_argument('--robust_policy', help='path to robust policy', type=str, default="")
+    parser.add_argument('--robust_policy_ratio', help='mix ratio of the robust policy', type=float, default=0.2)
+
     args = parser.parse_args()
 
     eval_repeat = 5
@@ -38,6 +43,9 @@ if __name__ == '__main__':
     policy_path = args.policy_path
     run_cma = args.run_cma == 'True'
     max_step = args.max_step
+
+    robust_policy_path = args.robust_policy
+    robust_policy_ratio = args.robust_policy_ratio
 
     use_sparse_rew = args.sparse_rew == 'True'
 
@@ -59,10 +67,10 @@ if __name__ == '__main__':
         if hasattr(env.env, 'disableViewer'):
             env.env.disableViewer = False
 
-    def policy_fn(name, ob_space, ac_space):
+    def policy_fn(name, ob_space, ac_space, obname='ob'):
         hid_size = 64
-        return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                                    hid_size=hid_size, num_hid_layers=3)
+        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                                    hid_size=hid_size, num_hid_layers=3, obname=obname)
 
     def policy_mirror_fn(name, ob_space, ac_space):
         obpermapp = np.arange(len(env.env.obs_perm), len(env.env.obs_perm)+UP_dim)
@@ -96,17 +104,18 @@ if __name__ == '__main__':
     policy = pol_fn("pi_test", ob_space, ac_space)
     policy_params = joblib.load(policy_path)
 
+    if len(robust_policy_path) > 0:
+        robust_policy = pol_fn("pi_robust", env.observation_space, env.action_space, obname='robust_ob')
+        robust_policy_params = joblib.load(robust_policy_path)
+
     sess = tf.InteractiveSession()
     U.initialize()
 
-    cur_scope = policy.get_variables()[0].name[0:policy.get_variables()[0].name.find('/')]
-    orig_scope = list(policy_params.keys())[0][0:list(policy_params.keys())[0].find('/')]
+    assign_params(policy, policy_params)
 
-    vars = policy.get_variables()
-    for i in range(len(policy.get_variables())):
-        assign_op = policy.get_variables()[i].assign(
-            policy_params[policy.get_variables()[i].name.replace(cur_scope, orig_scope, 1)])
-        sess.run(assign_op)
+    if len(robust_policy_path) > 0:
+        assign_params(robust_policy, robust_policy_params)
+        policy = CompositePolicy([policy, robust_policy], [1.0, 0.2], [len(env.observation_space.low)+UP_dim, len(env.observation_space.low)])
 
     optimizer = UPOptimizer(env, policy, UP_dim, eval_num=3, verbose=True)
 
