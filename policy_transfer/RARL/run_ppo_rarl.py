@@ -3,7 +3,6 @@ from baselines.common import set_global_seeds, tf_util as U
 from baselines import bench
 import os.path as osp
 import gym, logging
-import policy_transfer.envs
 from baselines import logger
 import sys
 import joblib
@@ -12,7 +11,7 @@ import numpy as np
 from mpi4py import MPI
 from policy_transfer.policies.mirror_policy import *
 from policy_transfer.policies.mlp_policy import MlpPolicy
-from policy_transfer.ppo.env_refpol import *
+import policy_transfer.envs
 
 output_interval = 10
 
@@ -31,9 +30,9 @@ def callback(localv, globalv):
 
 
 
-def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params, refpolicy,
-          fixed_UP_input):
-    from policy_transfer.ppo import ppo_sgd
+def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params,
+          rarl):
+    from RARL import ppo_rarl
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(seed)
 
@@ -78,15 +77,6 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
             hid_size=64, num_hid_layers=3, observation_permutation=env.env.env.obs_perm,
                             action_permutation=env.env.env.act_perm, soft_mirror=(mirror==2))
 
-    if len(fixed_UP_input) > 0:
-        upin = np.loadtxt(fixed_UP_input)[-1]
-        env.env.fixed_UP_obs = upin
-
-    refpolicy_params = None
-    if len(refpolicy) > 0:
-        refpolicy_params = joblib.load(refpolicy)
-        #env.env.velrew_weight = 0.0
-        env = EnvRefPolicy(env, None)
 
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), "monitor.json"), allow_early_resets=True)
@@ -105,7 +95,7 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
         warstart_params = None
 
 
-    ppo_sgd.learn(env, pol_func,
+    ppo_rarl.learn(env, pol_func,
             max_timesteps=num_timesteps,
             timesteps_per_batch=int(batch_size),
             clip_param=clip, entcoeff=0.0,
@@ -113,7 +103,7 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
             gamma=0.99, lam=0.95, schedule=schedule,
                         callback=callback,
                   init_policy_params=warstart_params,
-                  refpolicy_params = refpolicy_params
+                  rarl = rarl
     )
 
 
@@ -129,13 +119,13 @@ def main():
     parser.add_argument('--batch_size', help='batch size', type=int, default=4000)
     parser.add_argument('--clip', help='clip', type=float, default=0.2)
     parser.add_argument('--schedule', help='schedule', default='constant')
-    parser.add_argument('--train_up', help='whether train up', default='True')
+    parser.add_argument('--train_up', help='whether train up', default='False')
     parser.add_argument('--dyn_params', action='append', type=int)
     parser.add_argument('--output_interval', help='interval of outputting policies', type=int, default=10)
     parser.add_argument('--mirror', help='whether to use mirror, (0: not mirror, 1: hard mirror, 2: soft mirror)', type=int, default=0)
-    parser.add_argument('--refpolicy', help='path to reference policy', type=str, default="")
-    parser.add_argument('--fixed_UP_input', help='used fixed up input', type=str, default="")
     parser.add_argument('--warmstart', help='path to warmstart policies', type=str, default="")
+
+    parser.add_argument('--rarl', help='whether to train rarl policies', type=str, default="False")
 
 
     args = parser.parse_args()
@@ -155,17 +145,15 @@ def main():
     if args.train_up == 'True':
         config_name += '_UP'
 
-    if len(args.refpolicy) > 0:
-        config_name += '_refpol'
+    if args.rarl == 'True':
+        config_name += '_RARL'
 
-    if len(args.fixed_UP_input) > 0:
-        config_name += '_fixedUPin'
 
     logger.configure(config_name, ['json','stdout'])
     train(args.env, num_timesteps=int(args.max_step), seed=args.seed, batch_size=args.batch_size,
           clip=args.clip, schedule=args.schedule,
           mirror=args.mirror, warmstart=args.warmstart, train_up=args.train_up=='True', dyn_params = args.dyn_params,
-          refpolicy=args.refpolicy, fixed_UP_input=args.fixed_UP_input
+          rarl = args.rarl == 'True'
           )
 
 if __name__ == '__main__':

@@ -190,13 +190,14 @@ class DartEnv(gym.Env):
                     axis_rand = np.random.randint(0, 2, 1)[0]
                     direction_rand = np.random.randint(0, 2, 1)[0] * 2 - 1
                     self.perturb_force[axis_rand] = direction_rand * self.perturbation_parameters[1]
-                    perturbation_duration = self.perturbation_parameters[3]
+                    self.perturbation_duration = self.perturbation_parameters[3]
 
             else:
                 self.perturbation_duration -= 1
 
         for _ in range(n_frames):
             if self.add_perturbation:
+                print(self.perturb_force)
                 self.robot_skeleton.bodynodes[self.perturbation_parameters[2]].add_ext_force(self.perturb_force)
 
             self.robot_skeleton.set_forces(tau)

@@ -1,6 +1,7 @@
 import cma, sys, gym, joblib, tensorflow as tf
 from baselines import logger
 import numpy as np
+from policy_transfer.policy_transfer_strategy_optimization.bayesian_optimization import *
 
 class UPOptimizer:
     def __init__(self, env, policy, dim, eval_num = 2, verbose=True, terminate_threshold = -np.inf,
@@ -57,7 +58,7 @@ class UPOptimizer:
             self.best_x = np.copy(x)
             self.best_f = -np.mean(avg_perf)
             self.best_meanrollout_length = np.mean(rollout_len)
-        print('Sampled perf: ', np.mean(avg_perf))
+        #print('Sampled perf: ', np.mean(avg_perf))
         return -np.mean(avg_perf)
 
     def cames_callback(self, es):
@@ -89,11 +90,16 @@ class UPOptimizer:
 
             print(bound)
 
-            xopt, es = cma.fmin2(self.fitness, init_guess, init_std, options={'bounds': bound, 'maxiter': maxiter,
+            '''xopt, es = cma.fmin2(self.fitness, init_guess, init_std, options={'bounds': bound, 'maxiter': maxiter,
                                                                           'ftarget': self.terminate_threshold,
                                                                           'termination_callback': self.termination_callback
                                                                           },
-                                 callback=self.cames_callback)
+                                 callback=self.cames_callback)'''
+
+            xs, ys, _, _, _ = bayesian_optimisation(maxiter, self.fitness, np.array([bound]* self.dim), x0=None, n_pre_samples=10,
+                                  gp_params=None, random_search=1000, alpha=1e-5, epsilon=1e-7, max_steps=max_steps,
+                                  callback=self.cames_callback)
+            xopt = xs[np.argmin(ys)]
 
             print('optimized: ', repr(xopt))
         else:

@@ -4,6 +4,7 @@ from policy_transfer.envs.dart import dart_env
 
 from policy_transfer.envs.dart.parameter_managers import *
 import copy
+from gym import error, spaces
 
 class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
@@ -17,6 +18,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.velrew_weight = 1.0
         self.UP_noise_level = 0.0
         self.resample_MP = True  # whether to resample the model paraeters
+        self.fixed_UP_obs = None
 
         self.param_manager = hopperContactMassManager(self)
 
@@ -58,8 +60,14 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         # data structure for actuation modeling
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
 
-        self.add_perturbation=True
-        self.perturbation_parameters = [0.2, 300, 5, 20] # probability, magnitude, bodyid, duration
+        self.add_perturbation=False
+        self.perturbation_parameters = [0.1, 800, 5, 2] # probability, magnitude, bodyid, duration
+
+        self.learnable_perturbation = True
+        self.learnable_perturbation_list = [['h_foot', 20, 20]]  # [bodynode name, force magnitude, torque magnitude
+        self.learnable_perturbation_space = spaces.Box(np.array([-1] * len(self.learnable_perturbation_list) * 6),
+                                                       np.array([1] * len(self.learnable_perturbation_list) * 6))
+        self.learnable_perturbation_act = np.zeros(len(self.learnable_perturbation_list) * 6)
 
         utils.EzPickle.__init__(self)
 
@@ -70,6 +78,27 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
     def unpad_action(self, a):
         return a[3:]
+
+    def do_simulation(self, tau, n_frames):
+        for _ in range(n_frames):
+            if self.learnable_perturbation: # if learn to perturb
+                for bid, pert_param in enumerate(self.learnable_perturbation_list):
+                    force_dir = self.learnable_perturbation_act[bid * 6: bid * 6 + 3]
+                    torque_dir = self.learnable_perturbation_act[bid * 6 + 3: bid * 6 + 6]
+                    if np.all(force_dir == 0):
+                        pert_force = np.zeros(3)
+                    else:
+                        pert_force = pert_param[1] * force_dir / np.linalg.norm(force_dir)
+                    if np.all(torque_dir == 0):
+                        pert_torque = np.zeros(3)
+                    else:
+                        pert_torque = pert_param[2] * torque_dir / np.linalg.norm(torque_dir)
+                    self.robot_skeleton.bodynode(pert_param[0]).add_ext_force(pert_force)
+                    self.robot_skeleton.bodynode(pert_param[0]).add_ext_torque(pert_torque)
+
+
+            self.robot_skeleton.set_forces(tau)
+            self.dart_world.step()
 
     def advance(self, a):
         self.action_buffer.append(np.copy(a))
@@ -157,10 +186,13 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         state[0] = self.robot_skeleton.bodynodes[2].com()[1]
 
         if self.train_UP:
-            UP = self.param_manager.get_simulator_parameters()
-            if self.UP_noise_level > 0:
-                UP += np.random.uniform(-self.UP_noise_level, self.UP_noise_level, len(UP))
-                UP = np.clip(UP, -0.05, 1.05)
+            if self.fixed_UP_obs is None:
+                UP = self.param_manager.get_simulator_parameters()
+                if self.UP_noise_level > 0:
+                    UP += np.random.uniform(-self.UP_noise_level, self.UP_noise_level, len(UP))
+                    UP = np.clip(UP, -0.05, 1.05)
+            else:
+                UP = self.fixed_UP_obs
             state = np.concatenate([state, UP])
 
         if self.noisy_input:
@@ -191,6 +223,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
         qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
 
+
         self.set_state(qpos, qvel)
         if self.resample_MP:
             self.param_manager.resample_parameters()
@@ -207,6 +240,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.t = 0
 
         self.fall_on_ground = False
+
+        self.learnable_perturbation_act = np.zeros(len(self.learnable_perturbation_list) * 6)
 
         return state
 

@@ -115,9 +115,10 @@ if __name__ == '__main__':
 
     if len(robust_policy_path) > 0:
         assign_params(robust_policy, robust_policy_params)
-        policy = CompositePolicy([policy, robust_policy], [1.0, 0.2], [len(env.observation_space.low)+UP_dim, len(env.observation_space.low)])
+        policy = CompositePolicy([policy, robust_policy], [1.0, robust_policy_ratio], [len(env.observation_space.low)+UP_dim, len(env.observation_space.low)])
 
-    optimizer = UPOptimizer(env, policy, UP_dim, eval_num=3, verbose=True)
+
+    optimizer = UPOptimizer(env, policy, UP_dim, eval_num=3, verbose=False)
 
     if use_sparse_rew:
         env.env.use_sparse_reward = True
@@ -147,8 +148,15 @@ if __name__ == '__main__':
             for _ in range(eval_repeat):
                 traj, rews, rew = run_one_traj(env, policy, stochastic=False, observation_app=xopt)
                 eval_rew.append(rew)
-            print('Evaluated rew: ', np.mean(eval_rew))
+            #print('Evaluated rew: ', np.mean(eval_rew))
             reward_list.append(np.mean(eval_rew))
+
+        xopt = sol_list[-1]
+        eval_rew = []
+        for _ in range(50):
+            traj, rews, rew = run_one_traj(env, policy, stochastic=False, observation_app=xopt)
+            eval_rew.append(rew)
+        print('eval result ',np.mean(eval_rew))
 
         plt.figure()
         plt.plot(sample_num_list, reward_list)
@@ -156,11 +164,19 @@ if __name__ == '__main__':
 
         np.savetxt(logger.get_dir() + '/eval_results.txt', reward_list)
     else:
-        sol_list = np.loadtxt(logger.get_dir() + '/solution_list.pkl')
+        sol_list = np.loadtxt(logger.get_dir() + '/solution_list.txt')
         sample_num_list = np.loadtxt(logger.get_dir() + '/sample_num.txt')
 
+        xopt = sol_list[-1]
+        eval_rew = []
+        for _ in range(50):
+            traj, rews, rew = run_one_traj(env, policy, stochastic=False, observation_app=xopt)
+            eval_rew.append(rew)
+        print('eval result ',np.mean(eval_rew))
+
     # visualize the final policy
-    run_one_traj(env, policy, stochastic=False, observation_app=sol_list[-1], render=True)
+    #traj, rews, rew = run_one_traj(env, policy, stochastic=False, observation_app=sol_list[-1], render=True)
+    print(policy_path, optimizer.best_f)
 
 
 

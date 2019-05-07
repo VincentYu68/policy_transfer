@@ -29,6 +29,12 @@ class MujocoEnv(gym.Env):
         self.data = self.sim.data
         self.viewer = None
 
+        # random perturbation
+        self.add_perturbation = False
+        self.perturbation_parameters = [0.05, 3, 2, 40]  # probability, magnitude, bodyid, duration
+        self.perturbation_duration = 40
+        self.perturb_force = np.array([0, 0, 0])
+
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -76,6 +82,7 @@ class MujocoEnv(gym.Env):
     # -----------------------------
 
     def reset(self):
+        self.perturbation_duration = 0
         self.sim.reset()
         ob = self.reset_model()
         if self.viewer is not None:
@@ -95,8 +102,21 @@ class MujocoEnv(gym.Env):
         return self.model.opt.timestep * self.frame_skip
 
     def do_simulation(self, ctrl, n_frames):
+        if self.add_perturbation:
+            if self.perturbation_duration == 0:
+                self.perturb_force *= 0
+                if np.random.random() < self.perturbation_parameters[0]:
+                    axis_rand = np.random.randint(0, 2, 1)[0]
+                    direction_rand = np.random.randint(0, 2, 1)[0] * 2 - 1
+                    self.perturb_force[axis_rand] = direction_rand * self.perturbation_parameters[1]
+                    perturbation_duration = self.perturbation_parameters[3]
+            else:
+                self.perturbation_duration -= 1
+
         self.sim.data.ctrl[:] = ctrl
         for _ in range(n_frames):
+            if self.add_perturbation:
+                self.data.xfrc_applied[self.perturbation_parameters[2]][0:3] = self.perturb_force
             self.sim.step()
 
     def render(self, mode='human'):

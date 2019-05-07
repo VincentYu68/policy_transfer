@@ -30,6 +30,9 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         mujoco_env.MujocoEnv.__init__(self, 'hopper.xml', 4)
 
+        self.add_perturbation = False
+        self.perturbation_parameters = [0.2, 300, 2, 20]  # probability, magnitude, bodyid, duration
+
         utils.EzPickle.__init__(self)
 
     def pad_action(self, a):
@@ -127,8 +130,9 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return final_obs
 
     def reset_model(self):
-        qpos = self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
-        qvel = self.init_qvel + self.np_random.uniform(low=-.1, high=.1, size=self.model.nv)
+        qpos = self.init_qpos + self.np_random.uniform(low=-.01, high=.01, size=self.model.nq)
+        qvel = self.init_qvel + self.np_random.uniform(low=-.01, high=.01, size=self.model.nv)
+
         self.set_state(qpos, qvel)
 
         self.observation_buffer = []
