@@ -64,10 +64,15 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.perturbation_parameters = [0.1, 800, 5, 2] # probability, magnitude, bodyid, duration
 
         self.learnable_perturbation = True
-        self.learnable_perturbation_list = [['h_foot', 20, 20]]  # [bodynode name, force magnitude, torque magnitude
+        self.learnable_perturbation_list = [['h_shin', 80, 0]]  # [bodynode name, force magnitude, torque magnitude
         self.learnable_perturbation_space = spaces.Box(np.array([-1] * len(self.learnable_perturbation_list) * 6),
                                                        np.array([1] * len(self.learnable_perturbation_list) * 6))
         self.learnable_perturbation_act = np.zeros(len(self.learnable_perturbation_list) * 6)
+
+        self.lowlevel_policy = None
+        self.lowlevel_policy_dim = 5
+        self.highlevel_action_space = spaces.Box(low=np.array([-1] * self.lowlevel_policy_dim),
+                                                 high=np.array([1] * self.lowlevel_policy_dim))
 
         utils.EzPickle.__init__(self)
 
@@ -163,6 +168,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         return reward
 
     def step(self, a):
+        if self.lowlevel_policy is not None:
+            a, _ = self.lowlevel_policy.act(False, np.concatenate([self._get_obs(), a]))
+
         self.t += self.dt
         self.pre_advance()
         self.advance(a)

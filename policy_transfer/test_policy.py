@@ -89,8 +89,14 @@ if __name__ == '__main__':
         else:
             policy = policy_fn("pi", ob_space, ac_space)
 
+        if 'RARL' in sys.argv[2]:
+            rarl_policy = policy_fn('rarl_pi', ob_space, env.env.learnable_perturbation_space)
+            rarl_params = joblib.load(sys.argv[2].replace('policy_params.pkl', 'rarl_policy.pkl'))
+
         U.initialize()
         assign_params(policy, policy_params)
+        if 'RARL' in sys.argv[2]:
+            assign_params(rarl_policy, rarl_params)
 
     else:
         sys.argv.append('')
@@ -117,6 +123,11 @@ if __name__ == '__main__':
     while ct < traj:
         if len(append_o) > 0:
             o = np.concatenate([o, append_o])
+
+        if 'RARL' in sys.argv[2]:
+            rarl_act, _ = rarl_policy.act(False, o)
+            print(rarl_act)
+            env.env.learnable_perturbation_act = rarl_act
 
         if policy is not None:
             act, vpred = policy.act(step < 0, o)

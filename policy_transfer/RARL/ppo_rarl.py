@@ -211,7 +211,7 @@ def learn(env, policy_func, *,
 
 
     if rarl:
-        rarl_pi = policy_func('rarl_'+policy_scope, ob_space, env.env.env.learnable_perturbation_space)
+        rarl_pi = policy_func('rarl_'+policy_scope, ob_space, env.env.env.learnable_perturbation_space, normed_out = True)
         rarl_oldpi = policy_func('oldrarl_' + policy_scope, ob_space, env.env.env.learnable_perturbation_space)
         rarl_ac = rarl_pi.pdtype.sample_placeholder([None])
         rarl_ratio = tf.exp(rarl_pi.pd.logp(rarl_ac) - rarl_oldpi.pd.logp(rarl_ac))  # pnew / pold

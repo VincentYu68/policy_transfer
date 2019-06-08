@@ -197,7 +197,6 @@ class DartEnv(gym.Env):
 
         for _ in range(n_frames):
             if self.add_perturbation:
-                print(self.perturb_force)
                 self.robot_skeleton.bodynodes[self.perturbation_parameters[2]].add_ext_force(self.perturb_force)
 
             self.robot_skeleton.set_forces(tau)

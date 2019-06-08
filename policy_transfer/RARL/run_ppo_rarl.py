@@ -24,6 +24,15 @@ def callback(localv, globalv):
         cur_val = variables[i].eval()
         save_dict[variables[i].name] = cur_val
     joblib.dump(save_dict, logger.get_dir() + '/policy_params' + '.pkl', compress=True)
+
+    if 'rarl_pi' in localv:
+        save_dict = {}
+        variables = localv['rarl_pi'].get_variables()
+        for i in range(len(variables)):
+            cur_val = variables[i].eval()
+            save_dict[variables[i].name] = cur_val
+            joblib.dump(save_dict, logger.get_dir() + '/rarl_policy' + '.pkl', compress=True)
+
     if localv['iters_so_far'] % output_interval != 0:
         return
     joblib.dump(save_dict, logger.get_dir()+'/policy_params_'+str(localv['iters_so_far'])+'.pkl', compress=True)
@@ -32,7 +41,7 @@ def callback(localv, globalv):
 
 def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params,
           rarl):
-    from RARL import ppo_rarl
+    from policy_transfer.RARL import ppo_rarl
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(seed)
 
@@ -68,9 +77,9 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
     with open(logger.get_dir()+"/envinfo.txt", "w") as text_file:
         text_file.write(str(env.env.__dict__))
 
-    def policy_fn(name, ob_space, ac_space, obname='ob'):
+    def policy_fn(name, ob_space, ac_space, obname='ob', normed_out = False):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=64, num_hid_layers=3, obname=obname)
+            hid_size=64, num_hid_layers=3, obname=obname, normed_output = normed_out)
 
     def policy_mirror_fn(name, ob_space, ac_space):
         return MirrorPolicy(name=name, ob_space=ob_space, ac_space=ac_space,

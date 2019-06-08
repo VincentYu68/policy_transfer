@@ -25,7 +25,10 @@ def memory():
 
 def traj_segment_generator(pi, env, horizon, stochastic):
     t = 0
-    ac = env.action_space.sample() # not used, just so we have the datatype
+    if env.env.env.lowlevel_policy is not None:
+        ac = env.env.env.highlevel_action_space.sample()
+    else:
+        ac = env.action_space.sample() # not used, just so we have the datatype
     new = True # marks if we're on first timestep of an episode
     ob = env.reset()
 
@@ -148,15 +151,28 @@ def learn(env, policy_func, *,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
           init_policy_params = None,
           policy_scope='pi',
-          refpolicy_params= None
+          refpolicy_params= None,
+          ll_policy_params = None,
+          ll_dim = 0
         ):
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    pi = policy_func(policy_scope, ob_space, ac_space) # Construct network for new policy
-    oldpi = policy_func("old"+policy_scope, ob_space, ac_space) # Network for old policy
+    if ll_policy_params is None:
+        pi = policy_func(policy_scope, ob_space, ac_space) # Construct network for new policy
+        oldpi = policy_func("old"+policy_scope, ob_space, ac_space) # Network for old policy
+    else:
+        pi = policy_func(policy_scope, ob_space, env.env.env.highlevel_action_space)  # Construct network for new policy
+        oldpi = policy_func("old" + policy_scope, ob_space, env.env.env.highlevel_action_space)  # Network for old policy
+        from gym import spaces
+        high = np.inf * np.ones(len(ob_space.low) + ll_dim)
+        low = -high
+        ll_ob_space = spaces.Box(low, high)
+        lowlevel_pi = policy_func('lowlevelpi', ll_ob_space, ac_space, obname='llob')
+        env.env.env.lowlevel_policy = lowlevel_pi
+        env.env.env.lowlevel_policy_dim = ll_dim
 
     if refpolicy_params is not None:
         ref_pi = policy_func('ref'+policy_scope, env.env.base_env.observation_space, env.env.base_env.action_space,
@@ -249,6 +265,9 @@ def learn(env, policy_func, *,
 
     if refpolicy_params is not None:
         assign_params(ref_pi, refpolicy_params)
+
+    if ll_policy_params is not None:
+        assign_params(lowlevel_pi, ll_policy_params)
 
     # Prepare for rollouts
     # ----------------------------------------

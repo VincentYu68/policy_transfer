@@ -11,7 +11,7 @@ class MlpPolicy(object):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, obname='ob'):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, obname='ob', normed_output = False):
         assert isinstance(ob_space, gym.spaces.Box)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
@@ -37,7 +37,11 @@ class MlpPolicy(object):
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name='fc%i'%(i+1), kernel_initializer=U.normc_initializer(1.0)))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2, name='final', kernel_initializer=U.normc_initializer(0.01))
-                logstd = tf.get_variable(name="logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
+
+                if normed_output: # normalize output
+                    mean = mean / tf.norm(mean)
+
+                logstd = tf.get_variable(name="logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.constant_initializer(0.0))
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
                 pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0], name='final', kernel_initializer=U.normc_initializer(0.01))

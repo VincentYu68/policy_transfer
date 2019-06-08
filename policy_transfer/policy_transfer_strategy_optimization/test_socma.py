@@ -69,8 +69,9 @@ if __name__ == '__main__':
 
     def policy_fn(name, ob_space, ac_space, obname='ob'):
         hid_size = 64
+        num_hid = 3
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                                    hid_size=hid_size, num_hid_layers=3, obname=obname)
+                                    hid_size=hid_size, num_hid_layers=num_hid, obname=obname)
 
     def policy_mirror_fn(name, ob_space, ac_space):
         obpermapp = np.arange(len(env.env.obs_perm), len(env.env.obs_perm)+UP_dim)

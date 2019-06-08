@@ -32,7 +32,7 @@ def callback(localv, globalv):
 
 
 def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warmstart, train_up, dyn_params, refpolicy,
-          fixed_UP_input):
+          fixed_UP_input, ll_policy, ll_dim):
     from policy_transfer.ppo import ppo_sgd
     U.make_session(num_cpu=1).__enter__()
     set_global_seeds(seed)
@@ -104,6 +104,11 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
     else:
         warstart_params = None
 
+    if len(ll_policy) > 0:
+        ll_policy_params = joblib.load(ll_policy)
+    else:
+        ll_policy_params = None
+
 
     ppo_sgd.learn(env, pol_func,
             max_timesteps=num_timesteps,
@@ -113,7 +118,9 @@ def train(env_id, num_timesteps, seed, batch_size, clip, schedule, mirror, warms
             gamma=0.99, lam=0.95, schedule=schedule,
                         callback=callback,
                   init_policy_params=warstart_params,
-                  refpolicy_params = refpolicy_params
+                  refpolicy_params = refpolicy_params,
+                  ll_policy_params = ll_policy_params,
+                  ll_dim = ll_dim
     )
 
 
@@ -137,6 +144,8 @@ def main():
     parser.add_argument('--fixed_UP_input', help='used fixed up input', type=str, default="")
     parser.add_argument('--warmstart', help='path to warmstart policies', type=str, default="")
 
+    parser.add_argument('--ll_policy', help='path to low-level policy', type=str, default="")
+    parser.add_argument('--ll_dim', help='dimension of low-level policy', type=int, default=5)
 
     args = parser.parse_args()
     global output_interval
@@ -161,11 +170,15 @@ def main():
     if len(args.fixed_UP_input) > 0:
         config_name += '_fixedUPin'
 
+    if len(args.ll_policy) > 0:
+        config_name += '_lowlevelpolicy'
+
+
     logger.configure(config_name, ['json','stdout'])
     train(args.env, num_timesteps=int(args.max_step), seed=args.seed, batch_size=args.batch_size,
           clip=args.clip, schedule=args.schedule,
           mirror=args.mirror, warmstart=args.warmstart, train_up=args.train_up=='True', dyn_params = args.dyn_params,
-          refpolicy=args.refpolicy, fixed_UP_input=args.fixed_UP_input
+          refpolicy=args.refpolicy, fixed_UP_input=args.fixed_UP_input, ll_policy=args.ll_policy, ll_dim=args.ll_dim
           )
 
 if __name__ == '__main__':

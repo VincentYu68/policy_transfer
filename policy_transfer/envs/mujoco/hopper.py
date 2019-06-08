@@ -2,6 +2,7 @@ import numpy as np
 from gym import utils
 from policy_transfer.envs.mujoco import mujoco_env
 from policy_transfer.envs.dart.parameter_managers import *
+from gym import error, spaces
 
 class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
@@ -28,10 +29,16 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         self.total_reward = 0
 
-        mujoco_env.MujocoEnv.__init__(self, 'hopper.xml', 4)
+        self.lowlevel_policy = None
+        self.lowlevel_policy_dim = 5
+        self.highlevel_action_space = spaces.Box(low=np.array([-1] * self.lowlevel_policy_dim),
+                                                 high=np.array([1] * self.lowlevel_policy_dim))
 
         self.add_perturbation = False
         self.perturbation_parameters = [0.2, 300, 2, 20]  # probability, magnitude, bodyid, duration
+
+        mujoco_env.MujocoEnv.__init__(self, 'hopper.xml', 4)
+
 
         utils.EzPickle.__init__(self)
 
@@ -89,6 +96,9 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return reward
 
     def step(self, a):
+        if self.lowlevel_policy is not None:
+            # a = 0.2*a + np.array([0.09471898, 0.2101066 , 0.99302079, 0.51291866, 0.01000209])
+            a, _ = self.lowlevel_policy.act(False, np.concatenate([self._get_obs(), a]))
         self.cur_step += 1
         self.pre_advance()
         self.advance(a)
