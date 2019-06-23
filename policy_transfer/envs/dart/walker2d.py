@@ -10,7 +10,7 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         self.action_scale = np.array([100, 100, 20, 100, 100, 20])
         obs_dim = 17
         self.train_UP = False
-        self.noisy_input = False
+        self.noisy_input = True
         self.resample_MP = False
         self.UP_noise_level = 0.0
         self.param_manager = walker2dParamManager(self)

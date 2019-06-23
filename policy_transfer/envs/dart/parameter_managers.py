@@ -324,7 +324,7 @@ class walker2dParamManager:
         for jid in range(7, 13):
             if jid in self.controllable_param:
                 damp = x[cur_id] * (self.damping_range[1] - self.damping_range[0]) + self.damping_range[0]
-                self.simulator.robot_skeleton.joints[jid - 5].set_damping_coefficient(0, damp)
+                self.simulator.robot_skeleton.joints[jid - 4].set_damping_coefficient(0, damp)
                 cur_id += 1
 
         if 13 in self.controllable_param:

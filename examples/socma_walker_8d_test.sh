@@ -1,0 +1,2 @@
+python policy_transfer/policy_transfer_strategy_optimization/test_socma.py --env Walker2dPT-v2 --name dart2mujoco_8d\
+     --UP_dim 8 --policy_path data/ppo_DartWalker2dPT-v11_8d_mirror_UP/policy_params.pkl --run_cma True
