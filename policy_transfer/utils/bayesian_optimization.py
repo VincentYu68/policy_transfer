@@ -193,7 +193,7 @@ def bayesian_optimisation(n_iters, sample_loss, bounds, x0=None, n_pre_samples=5
 
         # Sample loss for new set of parameters
         cv_score = sample_loss(next_sample)
-        # print(next_sample, cv_score)
+        print(next_sample, cv_score)
 
         # Update lists
         x_list.append(next_sample)

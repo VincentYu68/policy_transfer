@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     optimizer.reset()
     if run_so:
-        optimizer.optimize(20, max_step)
+        optimizer.optimize(20, max_step, custom_bound=[-1.0, 1.0])
         # extract the solution list
         sol_list = optimizer.solution_history
         sample_num_list = optimizer.sample_num_history
