@@ -1,9 +1,10 @@
+from policy_transfer.utils.bayesian_optimization import *
 import cma, sys, gym, joblib, tensorflow as tf
 from baselines import logger
 import numpy as np
 
 class UPOptimizer:
-    def __init__(self, env, policy, dim, eval_num = 2, verbose=True, terminate_threshold = -np.inf,
+    def __init__(self, env, policy, dim, eval_num = 2, verbose=True, terminate_threshold = -np.inf, bayesian_opt=True,
                  max_rollout_length=None):
         self.env = env
         self.policy = policy
@@ -20,6 +21,8 @@ class UPOptimizer:
         self.best_x = None
         self.best_meanrollout_length = 0
         self.max_rollout_length = max_rollout_length
+
+        self.bayesian_opt = bayesian_opt
 
     def reset(self):
         self.sample_num = 0
@@ -57,7 +60,7 @@ class UPOptimizer:
             self.best_x = np.copy(x)
             self.best_f = -np.mean(avg_perf)
             self.best_meanrollout_length = np.mean(rollout_len)
-        print('Sampled perf: ', np.mean(avg_perf))
+        # print('Sampled perf: ', np.mean(avg_perf))
         return -np.mean(avg_perf)
 
     def cames_callback(self, es):
@@ -78,18 +81,29 @@ class UPOptimizer:
         return False
 
 
-    def optimize(self, maxiter = 20, max_steps = 200000):
-        if self.dim > 1:
+    def optimize(self, maxiter = 20, max_steps = 200000, custom_bound=None):
+        if self.dim > 1 or self.bayesian_opt:
             self.max_steps = max_steps
-            init_guess = [0.5] * self.dim
-            #init_guess = np.random.random(self.dim)
-            init_std = 0.25
 
-            bound = [0.0, 1.0]
+            if custom_bound is None:
+                init_guess = [0.0] * self.dim
+                init_std = 0.5
+                bound = [0.0, 1.0]
+            else:
+                init_guess = [0.5 * (custom_bound[0] + custom_bound[1])] * self.dim
+                init_std = abs(0.5 * (custom_bound[0] - custom_bound[1]))
+                bound = [custom_bound[0], custom_bound[1]]
 
-            print(bound)
 
-            xopt, es = cma.fmin2(self.fitness, init_guess, init_std, options={'bounds': bound, 'maxiter': maxiter,
+            if self.bayesian_opt:
+                xs, ys, _, _, _ = bayesian_optimisation(maxiter, self.fitness,
+                                                        bounds=np.array([bound] * self.dim),
+                                                        max_steps=max_steps,
+                                                        random_search = 1000,
+                                                        callback=self.cames_callback)
+                xopt=xs[np.argmin(ys)]
+            else:
+                xopt, es = cma.fmin2(self.fitness, init_guess, init_std, options={'bounds': bound, 'maxiter': maxiter,
                                                                           'ftarget': self.terminate_threshold,
                                                                           'termination_callback': self.termination_callback
                                                                           },

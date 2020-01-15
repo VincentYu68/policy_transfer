@@ -25,6 +25,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.t = 0
 
+        self.terminate_for_not_moving = [1.0, 1.5]  # [x, y]: need to move x meters in y seconds
+
         self.total_dist = []
 
         self.include_obs_history = 1
@@ -108,8 +110,14 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         height = self.robot_skeleton.bodynodes[2].com()[1]
         ang = self.robot_skeleton.q[2]
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and (np.abs(self.robot_skeleton.dq) < 100).all()\
-            #and not self.fall_on_ground)
             and (height > self.height_threshold_low) and (abs(ang) < .4))
+
+        if self.terminate_for_not_moving is not None:
+            if self.t > self.terminate_for_not_moving[1] and \
+                    (np.abs(self.robot_skeleton.q[0]) < self.terminate_for_not_moving[0] or
+                     self.robot_skeleton.q[0] * self.velrew_weight < 0):
+                done = True
+
         return done
 
     def pre_advance(self):
@@ -226,3 +234,14 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
     def get_sim_parameters(self):
         return self.param_manager.get_simulator_parameters()
+
+    def resample_task(self, iter_num=None):
+        self.resample_MP = False
+
+        self.param_manager.resample_parameters()
+        self.current_param = self.param_manager.get_simulator_parameters()
+
+        return np.array(self.current_param)
+
+    def set_task(self, task_params):
+        self.param_manager.set_simulator_parameters(task_params)

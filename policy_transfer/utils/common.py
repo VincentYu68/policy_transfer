@@ -18,6 +18,8 @@ def run_one_traj(env, policy, stochastic=True, observation_app = None, render=Fa
     rewards = []
     rew = 0
     o = env.reset()
+    if observation_app is not None:
+        o = np.concatenate([o, observation_app])
     obs.append(o)
     if hasattr(env, 'state_vector'):
         states.append(env.state_vector())
@@ -25,13 +27,14 @@ def run_one_traj(env, policy, stochastic=True, observation_app = None, render=Fa
     if policy.recurrent:
         init_state = policy.get_initial_state()
     while not d:
-        if observation_app is not None:
-            o = np.concatenate([o, observation_app])
         if policy.recurrent:
             ac, init_state = policy.act(stochastic, o, init_state)
         else:
             ac = policy.act(stochastic, o)[0]
         o, r, d, _ = env.step(ac)
+        if observation_app is not None:
+            o = np.concatenate([o, observation_app])
+
         if render:
             env.render()
         if hasattr(env, 'state_vector'):
