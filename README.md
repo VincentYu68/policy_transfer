@@ -1,6 +1,6 @@
 # Learning Transferrable and Adaptive Control Policies
 
-This is code for the following papers: 
+This repository contains implementations of transfer learning algorithms described in the following papers:
 
 <a href="https://arxiv.org/abs/1909.12995">Learning Fast Adaptation with Meta Strategy Optimization, ICRA 2020</a>
 
