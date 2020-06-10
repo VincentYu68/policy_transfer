@@ -2,9 +2,11 @@
 
 This is code for the following papers: 
 
-<a href="https://arxiv.org/abs/1810.05751">Policy Transfer with Strategy Optimization</a> 
+<a href="https://arxiv.org/abs/1909.12995">Learning Fast Adaptation with Meta Strategy Optimization, ICRA 2020</a>
 
-<a href="https://arxiv.org/abs/1702.02453">Prepare for the Unknown: Learning a Universal Policy with Online System Identification</a>
+<a href="https://arxiv.org/abs/1810.05751">Policy Transfer with Strategy Optimization, ICLR 2019</a> 
+
+<a href="https://arxiv.org/abs/1702.02453">Prepare for the Unknown: Learning a Universal Policy with Online System Identification, RSS 2017</a>
 
 ## Prerequisites
 
@@ -76,4 +78,4 @@ and follow the prompt in the terminal. After each rollout a plot of the estimate
 If you see errors like: ODE INTERNAL ERROR 1: assertion "d[i] != dReal(0.0)" failed in _dLDLTRemove(), try downloading [lcp.cpp](https://drive.google.com/file/d/1MCho3QBtyPhSoKNV77VFOvCqsMJPk3NF/view) and replace the one in dart/external/odelcpsolver/ with it. Recompile Dart and Pydart2 afterward and the issue should be gone.
 
 ## Additional feedbacks:
-Please contact Wenhao Yu (wenhaoyu@gatech.edu) if you have any feedbacks/questions about this work.
+Please contact Wenhao Yu (stacormed@gmail.com) if you have any feedbacks/questions about this work.
